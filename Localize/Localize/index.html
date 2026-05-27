@@ -1,0 +1,930 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Localize - Premium Tracking</title>
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;800&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --uber-black: #000000;
+            --uber-blue: #276ef1;
+            --glass-white: rgba(255, 255, 255, 0.95);
+            --glass-dark: rgba(15, 15, 15, 0.98);
+            --accent: #00d1ff;
+            --success: #05a357;
+            --error: #e11900;
+            --text-secondary: #8b8b8d;
+        }
+
+        * { box-sizing: border-box; -webkit-font-smoothing: antialiased; }
+        body, html { margin: 0; padding: 0; height: 100%; font-family: 'Plus Jakarta Sans', sans-serif; background: #000; overflow: hidden; }
+
+        /* ---  ESTÉTICA AUTH (Elegante & Dark) --- */
+        .auth-container {
+             position: fixed;
+             inset: 0;
+             z-index: 9999;
+             background: linear-gradient(135deg, rgba(0, 0, 0, 0.85), rgba(15, 15, 40, 0.9)),url('https://images.unsplash.com/photo-1558980664-10ea4c1d9d48?q=80&w=2000&auto=format&fit=crop') center/cover no-repeat;
+             display: flex;
+             justify-content: center;
+             align-items: center;
+             overflow: hidden;
+        }
+
+        .auth-container::before {
+             content: "";
+             position: absolute;
+             inset: 0;
+             background: radial-gradient(circle at 30% 20%, rgba(0, 209, 255, 0.18), transparent 50%);
+             pointer-events: none;
+        }
+
+        .auth-screen { 
+            width: 90%; 
+            max-width: 400px; 
+            padding: 40px; 
+            background: rgba(255, 255, 255, 0.03); 
+            border-radius: 28px; 
+            display: none; 
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(20px);
+            box-shadow: 0 25px 50px rgba(0,0,0,0.5);
+            text-align: center;
+        }
+
+        .auth-screen::before {
+             content: '';
+             position: absolute;
+             top: -50%;
+             left: -50%;
+             width: 200%;
+             height: 200%;
+             background: radial-gradient(circle, rgba(0,209,255,0.08) 0%, transparent 70%);
+             opacity: 0.6;
+             pointer-events: none;
+        }
+        .auth-screen h2 {
+             color: #00d1ff;
+             font-weight: 800;
+        }
+
+        .auth-screen p {
+             color: #8b8b8d;
+        }
+        
+
+        .auth-form input {
+             width: 100%;
+             padding: 18px 20px;
+             margin: 12px 0;
+             border-radius: 16px;
+             border: 1px solid rgba(255,255,255,0.25);
+             background: rgba(255,255,255,0.08);
+             color: #fff;
+             font-size: 16px;
+             transition: all 0.3s ease;
+        }
+
+        .auth-form input:focus {
+             border-color: #00d1ff;
+             background: rgba(255,255,255,0.12);
+             box-shadow: 0 0 0 4px rgba(0, 209, 255, 0.25);
+             outline: none;
+        }
+
+        .btn-primary {
+             width: 100%;
+             padding: 18px;
+             margin-top: 18px;
+             background: linear-gradient(90deg, #276ef1, #00d1ff);
+             border: none;
+             border-radius: 16px;
+             color: white;
+             font-size: 16px;
+             font-weight: 700;
+             letter-spacing: 0.5px;
+             box-shadow: 0 12px 35px rgba(39, 110, 241, 0.45);
+             transition: all 0.3s ease;
+        }
+
+        .btn-primary:hover {
+             transform: translateY(-3px);
+             box-shadow: 0 18px 40px rgba(39, 110, 241, 0.55);
+             filter: brightness(1.08);
+        }
+
+        .auth-link {
+             color: rgba(255, 255, 255, 0.75);
+             font-size: 14.8px;
+             display: inline-block;
+             cursor: pointer;
+             user-select: none;
+             transition: all 0.25s ease;
+             padding: 4px 8px;
+             border-radius: 6px;
+        }
+
+        .auth-link:hover {
+             color: #ffffff;
+             background: rgba(255, 255, 255, 0.08);
+        }
+
+        .auth-link b {
+             color: #00d1ff;
+             font-weight: 600;
+        }
+
+        /* Estilo para a Logo no Login */
+        .auth-logo {
+             width: 92px;
+             height: 92px;
+             border-radius: 22px;
+             background: linear-gradient(135deg, #276ef1, #00d1ff);
+             display: flex;
+             align-items: center;
+             justify-content: center;
+             margin: 0 auto 28px;
+             font-size: 42px;
+             box-shadow: 0 0 40px rgba(0, 209, 255, 0.6),inset 0 -4px 12px rgba(0,0,0,0.3);
+             border: 3px solid rgba(255,255,255,0.3);
+        }
+
+        /* --- AJUSTE  DE CAMADAS  --- */
+
+        /* 1. O MAPA (Asfalto) - Fica no fundo de tudo */
+        .leaflet-tile-pane {
+             z-index: 0 !important;
+        }
+
+        /* 2. A ROTA (Tinta/Estrada) - Fica acima do mapa */
+        .leaflet-overlay-pane {
+             z-index: 450 !important;
+        }
+
+        /*  Garante que o desenho da linha (SVG) apareça e não bloqueie cliques */
+        .leaflet-overlay-pane svg {
+            z-index: 500 !important;
+            pointer-events: none; 
+        }
+
+        /* 3. AS BOLINHAS (Motoristas) - Ficam acima da rota e do mapa */
+        .leaflet-marker-pane {
+            z-index: 600 !important;
+        }
+
+        /* 4. LIMPEZA: Esconde a caixinha branca de texto do roteamento que polui o mapa */
+        .leaflet-routing-container {
+            display: none !important;
+        }
+
+
+        /* --- APP --- */
+        #app-interface { display: none; height: 100vh; width: 100vw; position: relative; }
+        #map { position: absolute; inset: 0; z-index: 1; }
+
+        .sidebar { position: absolute; left: 20px; top: 50%; transform: translateY(-50%); width: 75px; background: var(--glass-dark); border-radius: 100px; display: flex; flex-direction: column; align-items: center; padding: 25px 0; z-index: 1000; box-shadow: 0 10px 30px rgba(0,0,0,0.5); gap: 20px; }
+        .nav-item { color: #555; cursor: pointer; transition: 0.3s; display: flex; flex-direction: column; align-items: center; }
+        .nav-item span { font-size: 24px; }
+        .nav-item small { font-size: 8px; font-weight: 800; text-transform: uppercase; margin-top: 4px; color: #888; }
+        .nav-item.active { color: var(--accent); }
+
+        /* Widgets Clima e Hora */
+        #weather-widget { position: absolute; top: 20px; right: 20px; z-index: 1001; background: var(--glass-dark); color: white; padding: 12px 25px; border-radius: 50px; display: flex; align-items: center; gap: 20px; }
+        #display-time { font-size: 20px; font-weight: 800; color: var(--accent); display: block; }
+
+        /* Painéis */
+        .panel { position: absolute; top: 20px; left: 110px; width: 360px; background: var(--glass-white); border-radius: 20px; padding: 25px; z-index: 1001; display: none; box-shadow: 0 15px 40px rgba(0,0,0,0.2); max-height: 85vh; overflow-y: auto; }
+        .info-row { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #eee; font-size: 14px; }
+
+        /* Histórico de Rotas com Lixeira */
+        .route-card { background: #fff; padding: 15px; border-radius: 12px; margin-bottom: 10px; border-left: 4px solid var(--uber-blue); box-shadow: 0 2px 5px rgba(0,0,0,0.05); position: relative; display: flex; justify-content: space-between; align-items: center; }
+        .route-info { flex: 1; }
+        .route-card b { display: block; font-size: 14px; color: #000; margin-bottom: 3px; }
+        .route-card small { color: var(--text-secondary); font-size: 11px; }
+        .btn-delete-route { background: none; border: none; color: var(--error); cursor: pointer; font-size: 18px; padding: 5px; opacity: 0.6; transition: 0.2s; }
+        .btn-delete-route:hover { opacity: 1; transform: scale(1.1); }
+
+        /* Buscador Inferior */
+        #route-setup { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); width: 90%; max-width: 450px; z-index: 1100; background: white; padding: 12px; border-radius: 24px; box-shadow: 0 15px 50px rgba(0,0,0,0.3); }
+        .search-box { background: #f3f3f3; border-radius: 16px; padding: 0 15px; display: flex; align-items: center; margin-bottom: 10px; }
+        #destination-input { flex: 1; border: none; background: transparent; padding: 18px 0; font-size: 16px; font-weight: 600; outline: none; }
+
+        #route-status { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); width: 380px; background: var(--glass-dark); color: white; padding: 25px; border-radius: 24px; z-index: 1100; text-align: center; border: 1px solid var(--accent); }
+
+        .profile-img { width: 90px; height: 90px; border-radius: 50%; border: 3px solid var(--uber-blue); margin: 0 auto 15px; background: #eee center/cover; }
+        .leaflet-routing-container { display: none !important; }
+
+        /* --- ESTILOS DE AMIGOS & CHAT --- */
+        .search-friend-box { display: flex; gap: 8px; margin-bottom: 20px; }
+        .search-friend-box input { flex: 1; padding: 12px; border-radius: 10px; border: 1px solid #ddd; outline: none; background: #f9f9f9; }
+        
+        .friend-card { background: #fff; padding: 15px; border-radius: 16px; margin-bottom: 12px; display: flex; align-items: center; gap: 12px; border: 1px solid #eee; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
+        .friend-avatar { width: 48px; height: 48px; border-radius: 50%; background: #eee center/cover; border: 2px solid var(--uber-blue); }
+        .friend-info { flex: 1; }
+        .friend-info b { display: block; font-size: 14px; color: #000; }
+        .friend-info small { color: var(--success); font-weight: bold; font-size: 10px; text-transform: uppercase; }
+        
+        .friend-actions { display: flex; gap: 6px; }
+        .btn-action { background: #f5f5f5; border: none; border-radius: 10px; padding: 10px; cursor: pointer; font-size: 16px; transition: 0.2s; }
+        .btn-action:hover { background: #eee; transform: scale(1.05); }
+        .btn-delete { color: var(--error); }
+
+        /* Janela de Chat */
+        #chat-window { position: fixed; bottom: 20px; right: 20px; width: 320px; height: 450px; background: white; z-index: 2000; border-radius: 24px; box-shadow: 0 10px 50px rgba(0,0,0,0.3); display: none; flex-direction: column; overflow: hidden; border: 1px solid #eee; }
+        #chat-header { background: var(--uber-black); color: white; padding: 18px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; }
+        #chat-messages { flex: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; background: #fdfdfd; }
+        .msg { padding: 10px 14px; border-radius: 18px; font-size: 13px; max-width: 85%; line-height: 1.4; }
+        .msg.sent { background: var(--uber-blue); color: white; align-self: flex-end; border-bottom-right-radius: 4px; }
+        .msg.received { background: #e9e9eb; color: #000; align-self: flex-start; border-bottom-left-radius: 4px; }
+        #chat-input-area { padding: 15px; border-top: 1px solid #eee; display: flex; gap: 8px; }
+        #chat-input-area input { flex: 1; border: none; background: #f0f0f0; padding: 12px; border-radius: 12px; outline: none; }
+        
+    </style>
+</head>
+<body>
+
+<div id="auth-container" class="auth-container">
+    <div id="screen-login" class="auth-screen" style="display: block;">
+        <div class="auth-logo">📍</div>
+        <h2>Localize</h2>
+        <p>Acesse sua conta para continuar</p>
+        <div class="auth-form">
+            <input type="text" id="login-identifier" placeholder="E-mail ou Telefone" onkeyup="smartMask(this)">
+            <input type="password" id="login-pass" placeholder="Sua senha">
+            <button class="btn-primary" onclick="handleLogin()">ENTRAR NO SISTEMA</button>
+            
+            <div style="margin-top: 15px;">
+                <span class="auth-link" onclick="navigate('screen-forgot')">Esqueceu sua senha?</span>
+            </div>
+            <div class="auth-link" onclick="navigate('screen-register')">
+                Não tem conta? <b>Registre-se</b>
+            </div>
+        </div>
+        
+    </div>
+
+    
+    <div id="screen-register" class="auth-screen">
+        <h2>Criar Conta</h2>
+        <p>Junte-se à maior rede de rastreamento</p>
+        <div class="auth-form">
+            <input type="text" id="reg-name" placeholder="Nome Completo">
+            <input type="email" id="reg-email" placeholder="E-mail">
+            <input type="tel" id="reg-phone" placeholder="Telefone" onkeyup="applyPhoneMask(this)">
+            <input type="password" id="reg-pass" placeholder="Crie uma senha">
+            <button class="btn-primary" onclick="handleRegister()">FINALIZAR CADASTRO</button>
+            <div class="auth-link" onclick="navigate('screen-login')">Voltar para o <b>Login</b></div>
+        </div>
+    </div>
+
+    <div id="screen-forgot" class="auth-screen">
+        <div class="auth-logo" style="background: #333;">🔑</div>
+        <h2>Recuperar Acesso</h2>
+        <p>Digite seu e-mail para receber as instruções de recuperação</p>
+        <div class="auth-form">
+            <input type="email" id="forgot-email" placeholder="E-mail cadastrado">
+            <button class="btn-primary" onclick="handleForgot()">ENVIAR LINK</button>
+            <div class="auth-link" onclick="navigate('screen-login')">Lembrei a senha! <b>Voltar</b></div>
+        </div>
+    </div>
+</div>
+
+<div id="app-interface">
+    <div id="weather-widget">
+        <div style="text-align:right; border-right: 1px solid rgba(255,255,255,0.1); padding-right:15px;">
+            <span id="display-time">00:00:00</span>
+            <span id="display-date" style="font-size:10px; color:#aaa">--/--/----</span>
+        </div>
+        <div>
+            <span id="weather-temp" style="font-weight: 800; font-size: 18px;">--°C</span>
+            <div id="weather-desc" style="font-size:9px; color:var(--accent); text-transform:uppercase;">Carregando...</div>
+        </div>
+    </div>
+
+    <nav class="sidebar">
+        <div class="nav-item active" onclick="menuAction(this, 'map-only')"><span>📍</span><small>Mapa</small></div>
+        <div class="nav-item" onclick="menuAction(this, 'rotas')"><span>📊</span><small>Rotas</small></div>
+        <div class="nav-item" onclick="menuAction(this, 'amigos')"><span>👥</span><small>Amigos</small></div>
+        <div class="nav-item" style="margin-top:auto;" onclick="menuAction(this, 'profile')"><span>⚙️</span><small>Perfil</small></div>
+    </nav>
+
+    <div id="profile-panel" class="panel">
+        <h4>Perfil do Usuário</h4>
+        <div style="text-align:center; margin-bottom:20px;">
+            <div id="profile-img-preview" class="profile-img"></div>
+            <label for="p-avatar-file" style="color:var(--uber-blue); cursor:pointer; font-size:12px; font-weight:bold;">Trocar Foto 📸</label>
+            <input type="file" id="p-avatar-file" style="display:none" onchange="handleFileSelect(this)">
+        </div>
+        
+        <div class="info-row"><b>ID</b> <span id="user-id-display">#00000</span></div>
+        <div class="info-row"><b>Nome</b> <input type="text" id="p-name" style="border:none; text-align:right; font-weight:bold; outline:none; width:150px;"></div>
+        <div class="info-row"><b>E-mail</b> <input type="text" id="p-email" style="border:none; text-align:right; font-weight:bold; outline:none; width:180px;"></div>
+        <div class="info-row"><b>Telefone</b> <span id="p-phone-display" style="color:var(--uber-blue); font-weight:700;">(00) 00000-0000</span></div>
+
+        <button class="btn-primary" onclick="togglePasswordFields()" style="background:#f3f3f3; color:#000; font-size:12px;">SEGURANÇA (SENHA)</button>
+        
+        <div id="password-change-container" style="display:none; margin-top:15px; background:#fff; padding:15px; border-radius:12px; border:1px solid #eee;">
+            <input type="password" id="p-old-pass" placeholder="Senha Atual" style="width:100%; padding:10px; margin-bottom:8px; border-radius:8px; border:1px solid #ddd;">
+            <input type="password" id="p-new-pass" placeholder="Nova Senha" style="width:100%; padding:10px; margin-bottom:8px; border-radius:8px; border:1px solid #ddd;">
+            <input type="password" id="p-new-pass" placeholder="Repita a Senha" style="width:100%; padding:10px; margin-bottom:8px; border-radius:8px; border:1px solid #ddd;">
+            <div style="display:flex; gap:10px;">
+                <button class="btn-primary" onclick="confirmPasswordChange()" style="flex:2; margin-top:0; padding:10px; background:var(--success)">Confirmar</button>
+                <button class="btn-primary" onclick="togglePasswordFields()" style="flex:1; margin-top:0; padding:10px; background:#999">X</button>
+            </div>
+        </div>
+        
+        <button class="btn-primary" onclick="saveProfile()" style="background:var(--uber-blue);">ATUALIZAR DADOS</button>
+    </div>
+
+    <div id="amigos-panel" class="panel">
+        <h4>Meus Amigos</h4>
+        <div class="search-friend-box">
+            <input type="text" id="find-friend-input" placeholder="digite o ID ou Telefone para adicionar">
+            <button class="btn-primary" style="margin:0; width:50px; height:45px;" onclick="addFriend()">+</button>
+        </div>
+        <div id="friends-list">
+            </div>
+    </div>
+
+    <div id="chat-window">
+        <div id="chat-header">
+            <span id="chat-friend-name">Conversa</span>
+            <span onclick="closeChat()" style="cursor:pointer; font-size: 20px;">×</span>
+        </div>
+        <div id="chat-messages"></div>
+        <div id="chat-input-area">
+            <input type="text" id="chat-msg-input" placeholder="Mensagem...">
+            <button onclick="sendMessage()" style="border:none; background:none; font-size:22px; cursor:pointer">➔</button>
+        </div>
+    </div>
+
+    <div id="rotas-panel" class="panel">
+        <h4>Minhas Rotas</h4>
+        <div id="travel-history-list">
+            <p style="text-align:center; color:#999; font-size:12px;">Nenhuma viagem registrada.</p>
+        </div>
+    </div>
+
+    <div id="route-setup">
+        <div class="search-box">
+            <span style="margin-right:10px;">🔍</span>
+            <input type="text" id="destination-input" list="dest-suggestions" placeholder="Para onde vamos?">
+            <datalist id="dest-suggestions"></datalist>
+        </div>
+        <button class="btn-primary" onclick="calculateUberRoute()" style="margin-top:0; border-radius:16px; background:var(--uber-blue)">Iniciar Navegação</button>
+    </div>
+
+    <div id="route-status" style="display:none">
+        <div id="info-chegada" style="color:#aaa; margin-bottom:5px;">A caminho do destino...</div>
+        <span id="route-timer" style="font-size:32px; font-weight:800; color:var(--accent); font-family:monospace;">00:00:00</span>
+        <button onclick="stopRoute()" style="background:none; border:none; color:var(--error); font-weight:bold; cursor:pointer; margin-top:15px; display:block; width:100%;">ENCERRAR VIAGEM</button>
+    </div>
+
+    <div id="map"></div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.js"></script>
+
+
+<script>
+    
+    let currentRouteData = {
+    distancia: "",
+    tempoEstimado: ""
+    };
+    let usersDB = JSON.parse(localStorage.getItem('usersDB')) || [{name: "Admin",email: "admin@admin.com",phone: "(81) 98888-7777",pass: "123",id: "00001"}];
+    let map, marker, routingControl, timerInterval, tempoEspera;
+    let seconds = 0;
+    let historyRotas = [];
+
+    // Estilo dos Ícones (Bolinha com borda branca e sombra)
+    const criarIcone = (cor) => L.divIcon({className: 'custom-marker',
+    html: `<div style="width: 18px; height: 18px; background-color: ${cor}; border: 3px solid white; border-radius: 50%; box-shadow: 0 0 10px rgba(0,0,0,0.5);"></div>`,
+    iconSize: [18, 18],
+    iconAnchor: [9, 9]
+    });
+
+    const iconUser = criarIcone('#276ef1'); // Seu Azul
+    const iconFriend = criarIcone('#05a357'); // Verde do Amigo
+
+        let friendMarkers = {}; // Objeto para controlar os marcadores dos amigos no mapa
+
+    // Máscaras
+    function smartMask(input) { if (input.value.length > 0 && /\d/.test(input.value[0])) applyPhoneMask(input); }
+    function applyPhoneMask(input) {
+        let v = input.value.replace(/\D/g, "");
+        v = v.replace(/^(\d{2})(\d)/g, "($1) $2");
+        v = v.replace(/(\d)(\d{4})$/, "$1-$2");
+        input.value = v;
+    }
+
+    function navigate(id) {
+        document.querySelectorAll('.auth-screen').forEach(s => s.style.display = 'none');
+        document.getElementById(id).style.display = 'block';
+    }
+
+    function handleLogin() {
+        const iden = document.getElementById('login-identifier').value;
+        const pass = document.getElementById('login-pass').value;
+        const user = usersDB.find(u => (u.email === iden || u.phone === iden || iden === "admin") && u.pass === pass);
+
+        if (user) {
+            document.getElementById('auth-container').style.display = 'none';
+            document.getElementById('app-interface').style.display = 'flex';
+            document.getElementById('p-name').value = user.name;
+            document.getElementById('p-email').value = user.email;
+            document.getElementById('p-phone-display').innerText = user.phone;
+            document.getElementById('user-id-display').innerText = `#${user.id}`;
+            initMap();
+            updateClock();
+            setInterval(updateClock, 1000);
+            updateWeather(); // Chamada reforçada
+        } else { alert("Acesso negado."); }
+    }
+
+    function handleRegister() {
+
+    const nome = document.getElementById('reg-name').value;
+    const email = document.getElementById('reg-email').value;
+    const telefone = document.getElementById('reg-phone').value;
+    const senha = document.getElementById('reg-pass').value;
+
+    if (!nome || !email || !telefone || !senha) {
+        alert("Preencha todos os campos!");
+        return;
+    }
+
+    // Verifica se já existe
+    const usuarioExistente = usersDB.find(
+        u => u.email === email || u.phone === telefone
+    );
+
+    if (usuarioExistente) {
+        alert("Usuário já cadastrado!");
+        return;
+    }
+
+    const novoUsuario = {
+        name: nome,
+        email: email,
+        phone: telefone,
+        pass: senha,
+        id: String(usersDB.length + 1).padStart(5, '0')
+    };
+
+    usersDB.push(novoUsuario);
+
+    // SALVA NO NAVEGADOR
+    localStorage.setItem('usersDB', JSON.stringify(usersDB));
+
+     alert("Conta criada com sucesso!");
+
+     console.log(usersDB);
+
+     navigate('screen-login');
+
+    }
+
+
+    // Variável global para controlar a camada do mapa
+    let currentTileLayer;
+
+    function initMap() {
+        if (map) return;
+
+        // 1. Definimos os limites da América do Sul para o usuário não se perder no mar
+        const southAmericaBounds = L.latLngBounds(
+            L.latLng(-56.0, -94.0), // Canto Inferior Esquerdo
+            L.latLng(13.0, -28.0)   // Canto Superior Direito
+        );
+
+        // ALTERAÇÃO AQUI: Adicionamos minZoom, maxBounds e maxBoundsViscosity
+        map = L.map('map', { 
+            zoomControl: false,
+            minZoom: 4,                  // Limite de "contra-zoom" (não deixa afastar mais que isso)
+            maxBounds: southAmericaBounds, // Prende o mapa na região definida acima
+            maxBoundsViscosity: 1.0      // Faz o mapa "quicar" de volta se tentar sair do limite
+        }).setView([-8.0578, -34.8829], 15);
+    
+        updateMapTheme();
+
+        // 2. Tenta localizar o usuário imediatamente
+        map.locate({setView: true, maxZoom: 16});
+
+        // 3. Quando a localização for encontrada:
+        map.on('locationfound', function(e) {
+            if (marker) map.removeLayer(marker); 
+        
+            marker = L.marker(e.latlng, { icon: iconUser }).addTo(map)
+                .bindPopup("Você está aqui").openPopup();
+            
+        // Inicia o motor de movimento dos amigos
+        if (!window.simulacaoIniciada) { // Evita criar vários intervalos se localizar de novo
+            setInterval(simularMovimentoAmigos, 3000);
+            window.simulacaoIniciada = true;
+        }
+    });
+
+    // 4. Caso haja erro no GPS (usuário negou ou sinal ruim)
+    map.on('locationerror', function(e) {
+        alert("Não foi possível obter sua localização. Mantendo em Recife.");
+        marker = L.marker([-8.0578, -34.8829]).addTo(map);});
+    }
+
+    function updateMapTheme() {
+    const styleUrl = 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
+
+    if (currentTileLayer) {
+        if (currentTileLayer._url === styleUrl) return;
+        map.removeLayer(currentTileLayer);
+    }
+
+    currentTileLayer = L.tileLayer(styleUrl, {
+        attribution: '© OpenStreetMap contributors © CARTO',
+        zIndex: 0 
+    }).addTo(map);
+
+    currentTileLayer.bringToBack();
+
+    if(marker) marker.bringToFront();
+    Object.values(friendMarkers).forEach(m => m.bringToFront());
+    }
+    
+    // Buscador
+    const destInp = document.getElementById('destination-input');
+    destInp.addEventListener('input', (e) => {
+        const q = e.target.value;
+        clearTimeout(tempoEspera);
+        if(q.length < 3) return;
+        tempoEspera = setTimeout(async () => {
+            const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${q}&countrycodes=br&limit=5`);
+            const data = await res.json();
+            document.getElementById('dest-suggestions').innerHTML = data.map(i => `<option value="${i.display_name}">`).join('');
+        }, 600);
+    });
+
+    async function calculateUberRoute() {
+          const dest = document.getElementById('destination-input').value;
+          if (!dest) return;
+    
+         const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(dest)}&limit=1`);
+         const data = await res.json();
+    
+         if(data.length > 0) {
+             const endCoords = L.latLng(data[0].lat, data[0].lon);
+             const startCoords = marker.getLatLng();
+        
+             if(routingControl) map.removeControl(routingControl);
+
+             routingControl = L.Routing.control({
+                 waypoints: [startCoords, endCoords],
+                 plan: L.Routing.plan([startCoords, endCoords], {
+                     createMarker: function(i, wp) {
+                         if (i === 0) return null; 
+                         return L.marker(wp.latLng, {
+                             icon: criarIcone('#ff4444'),
+                             zIndexOffset: 1000 // Garante que a bolinha fique no topo
+                        });
+                    }
+                }),
+                lineOptions: {
+                    styles: [
+                        { color: '#ffffff', opacity: 0.6, weight: 10 }, // Brilho externo
+                        { color: '#00d1ff', opacity: 1, weight: 6 }    // Linha principal neon
+                    ],
+                    extendToWaypoints: true,
+                    missingRouteTolerance: 10
+                },
+                router: L.Routing.osrmv1({
+                    serviceUrl: `https://router.project-osrm.org/route/v1`
+                }),
+                show: false,
+                addWaypoints: false,
+                routeWhileDragging: false,
+                fitSelectedRoutes: true
+            }).addTo(map);
+
+            // FORÇAR O DESENHO DA LINHA
+            routingControl.route(); 
+
+            routingControl.on('routesfound', function(e) {
+                const summary = e.routes[0].summary;
+                currentRouteData.distancia = `${(summary.totalDistance / 1000).toFixed(2)} km`;
+                currentRouteData.tempoEstimado = `${Math.round(summary.totalTime / 60)} min`;
+
+                document.getElementById('info-chegada').innerText =
+                `Distância: ${currentRouteData.distancia} • Tempo estimado: ${currentRouteData.tempoEstimado}`;
+            
+                // Ajusta o zoom para caber a rota e a linha
+                map.fitBounds(L.latLngBounds([startCoords, endCoords]), { padding: [50, 50] });
+            });
+
+            // Interface (suas IDs originais)
+            document.getElementById('route-setup').style.display = 'none';
+            document.getElementById('route-status').style.display = 'block';
+            startTimer();
+        }
+    }
+    
+
+    function startTimer() {
+        seconds = 0; clearInterval(timerInterval);
+        timerInterval = setInterval(() => {
+            seconds++;
+            let h = Math.floor(seconds/3600).toString().padStart(2,'0');
+            let m = Math.floor((seconds%3600)/60).toString().padStart(2,'0');
+            let s = (seconds%60).toString().padStart(2,'0');
+            document.getElementById('route-timer').innerText = `${h}:${m}:${s}`;
+        }, 1000);
+    }
+
+    function stopRoute() {
+        const dest = document.getElementById('destination-input').value;
+        const tempo = document.getElementById('route-timer').innerText;
+        const dataH = new Date().toLocaleString('pt-BR');
+
+         // 🚀 GARANTE QUE TEM DADOS
+         const distancia = currentRouteData.distancia || "N/A";
+         const tempoEstimado = currentRouteData.tempoEstimado || "N/A";
+
+         historyRotas.unshift({
+         dest: dest.split(',')[0],
+         tempoReal: tempo,
+         distancia,
+         tempoEstimado,
+         dataH
+        });
+
+    renderRotas();
+
+        if (routingControl) map.removeControl(routingControl);
+        clearInterval(timerInterval);
+
+        document.getElementById('route-status').style.display = 'none';
+        document.getElementById('route-setup').style.display = 'block';
+    }
+
+    // --- FUNÇÕES DE ROTAS (COM APAGAR) ---
+    function renderRotas() {
+        const list = document.getElementById('travel-history-list');
+        if(historyRotas.length === 0) {
+            list.innerHTML = '<p style="text-align:center; color:#999; font-size:12px;">Nenhuma viagem registrada.</p>';
+            return;
+        }
+        list.innerHTML = historyRotas.map((r, index) => `
+            <div class="route-card" onclick="verDetalhes(${index})">
+            <div class="route-info"><b>📍 ${r.dest}</b><small>📏 ${r.distancia} • ⏱ ${r.tempoReal} • ⌛ ${r.tempoEstimado}<br>📅 ${r.dataH}</small></div>
+            <button class="btn-delete-route" onclick="event.stopPropagation(); deleteRota(${index})">🗑️</button></div>
+        `).join('');
+    }
+
+    function deleteRota(index) {
+        if(confirm("Deseja apagar este registro de rota?")) {
+            historyRotas.splice(index, 1);
+            renderRotas();
+        }
+    }
+    function verDetalhes(index) {
+        const r = historyRotas[index];alert(`📍 Destino: ${r.dest}\n\n` +`📏 Distância: ${r.distancia}\n` +`⌛ Tempo estimado: ${r.tempoEstimado}\n` +`⏱ Tempo real: ${r.tempoReal}\n\n` +`📅 Data: ${r.dataH}`);
+    }
+
+    // --- INTERAÇÕES ---
+    function togglePasswordFields() {
+        const c = document.getElementById('password-change-container');
+        c.style.display = c.style.display === 'none' ? 'block' : 'none';
+    }
+
+    function updateClock() {
+        const agora = new Date();
+        document.getElementById('display-time').innerText = agora.toLocaleTimeString('pt-BR');
+        document.getElementById('display-date').innerText = agora.toLocaleDateString('pt-BR');
+    }
+
+    // --- CLIMA (FIX) ---
+    async function updateWeather() {
+        const tempEl = document.getElementById('weather-temp');
+        const descEl = document.getElementById('weather-desc');
+
+        if (!navigator.geolocation) {
+            descEl.innerText = "GPS Indisponível";
+            return;
+        }
+
+        navigator.geolocation.getCurrentPosition(async (pos) => {
+            try {
+                const url = `https://api.open-meteo.com/v1/forecast?latitude=${pos.coords.latitude}&longitude=${pos.coords.longitude}&current_weather=true`;
+                const res = await fetch(url);
+                const data = await res.json();
+                const temp = Math.round(data.current_weather.temperature);
+                tempEl.innerText = `${temp}°C`;
+                descEl.innerText = "Céu Estável";
+            } catch (e) { 
+                tempEl.innerText = "--°C";
+                descEl.innerText = "Erro API"; 
+            }
+        }, () => {
+            tempEl.innerText = "--°C";
+            descEl.innerText = "Permita o GPS";
+        });
+    }
+
+    function handleFileSelect(input) {
+        if (input.files[0]) {
+            const reader = new FileReader();
+            reader.onload = e => document.getElementById('profile-img-preview').style.backgroundImage = `url('${e.target.result}')`;
+            reader.readAsDataURL(input.files[0]);
+        }
+    }
+
+    function saveProfile() { alert("Dados salvos!"); }
+    function confirmPasswordChange() { alert("Senha alterada!"); togglePasswordFields(); }
+
+    // Simulação de banco de dados para encontrar amigos
+    const globalUsers = [
+        { id: "55001", name: "Vini Driver", phone: "(81) 99999-9999", lat: -8.0542, lon: -34.8813 }, // Recife (Derby)
+        { id: "22040", name: "Ana Silva", phone: "(81) 98888-8888", lat: -7.9912, lon: -34.8507 },  // Olinda (Praça do Carmo)
+        { id: "33010", name: "Lucas Entregas", phone: "(81) 97777-7777", lat: -7.9350, lon: -34.8600 }, // Tabajara (Cidade Tabajara)
+        { id: "44020", name: "Carla Rastreio", phone: "(81) 96666-6666", lat: -7.8450, lon: -34.8350 }  // Maria Farinha (Litoral)
+    ];
+
+    let friendsList = [
+        { id: "55001", name: "Vini Driver", phone: "(81) 99999-9999", lat: -8.0542, lon: -34.8813 },
+        { id: "22040", name: "Ana Silva", phone: "(81) 98888-8888", lat: -7.9912, lon: -34.8507 },
+        { id: "33010", name: "Lucas Entregas", phone: "(81) 97777-7777", lat: -7.9350, lon: -34.8600 },
+        { id: "44020", name: "Carla Rastreio", phone: "(81) 96666-6666", lat: -7.8450, lon: -34.8350 }
+    ];
+
+    // --- FUNÇÕES DE AMIGOS ---
+
+    function renderFriends() {
+        const container = document.getElementById('friends-list');
+        if(friendsList.length === 0) {
+            container.innerHTML = '<p style="text-align:center; color:#999; font-size:12px; margin-top:30px;">Nenhum amigo encontrado.</p>';
+            return;
+        }
+        
+        container.innerHTML = friendsList.map((f, index) => `
+            <div class="friend-card">
+                <div class="friend-avatar"></div>
+                <div class="friend-info">
+                    <b>${f.name}</b>
+                    <small>Online agora</small>
+                </div>
+                <div class="friend-actions">
+                    <button class="btn-action" title="Ver no Mapa" onclick="locateFriend(${f.lat}, ${f.lon}, '${f.name}')">📍</button>
+                    <button class="btn-action" title="Chat" onclick="openChat('${f.name}')">💬</button>
+                    <button class="btn-action btn-delete" title="Apagar" onclick="deleteFriend(${index})">🗑️</button>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    function addFriend() {
+        const input = document.getElementById('find-friend-input').value;
+        const found = globalUsers.find(u => u.id === input || u.phone === input);
+        
+        if(found) {
+            if(friendsList.find(f => f.id === found.id)) {
+                alert("Este amigo já está na sua lista!");
+                return;
+            }
+            friendsList.push(found);
+            renderFriends();
+            document.getElementById('find-friend-input').value = "";
+            alert("Amigo adicionado com sucesso!");
+        } else {
+            alert("Usuário não encontrado. Verifique o ID ou Telefone.");
+        }
+    }
+
+    function deleteFriend(index) {
+    if(confirm("Tem certeza que deseja remover este amigo?")) {
+        const amigoRemovido = friendsList[index];
+        
+        // Remove a bolinha do mapa antes de tirar da lista
+        if(friendMarkers[amigoRemovido.id]) {
+            map.removeLayer(friendMarkers[amigoRemovido.id]);
+            delete friendMarkers[amigoRemovido.id];
+        }
+
+        friendsList.splice(index, 1);
+        renderFriends();}
+    }
+
+    function locateFriend(lat, lon, name) {
+        map.flyTo([lat, lon], 17);
+        L.popup()
+            .setLatLng([lat, lon])
+            .setContent(`<b>${name}</b> está aqui agora.`)
+            .openOn(map);
+    }
+
+    // --- SISTEMA DE CHAT ---
+
+    function openChat(name) {
+        document.getElementById('chat-friend-name').innerText = name;
+        document.getElementById('chat-window').style.display = 'flex';
+        // Mensagem de boas-vindas automática
+        document.getElementById('chat-messages').innerHTML = `
+            <div class="msg received">E aí! Tudo certo?</div>
+        `;
+    }
+
+    function closeChat() {
+        document.getElementById('chat-window').style.display = 'none';
+    }
+
+    function sendMessage() {
+        const input = document.getElementById('chat-msg-input');
+        if(!input.value) return;
+
+        const msgBox = document.getElementById('chat-messages');
+        msgBox.innerHTML += `<div class="msg sent">${input.value}</div>`;
+        
+        // Simular resposta automática após 1 segundo
+        const text = input.value;
+        input.value = "";
+        msgBox.scrollTop = msgBox.scrollHeight;
+
+        setTimeout(() => {
+            msgBox.innerHTML += `<div class="msg received">Beleza! Vou verificar isso sobre "${text}".</div>`;
+            msgBox.scrollTop = msgBox.scrollHeight;
+        }, 1000);
+    }
+
+    // --- AJUSTE NO MENU ACTION ---
+    // Atualize sua função menuAction para incluir 'amigos'
+    function menuAction(el, type) {
+        document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+        if(el) el.classList.add('active');
+        document.querySelectorAll('.panel').forEach(p => p.style.display = 'none');
+        
+        if(type === 'profile') document.getElementById('profile-panel').style.display = 'block';
+        if(type === 'rotas') document.getElementById('rotas-panel').style.display = 'block';
+        if(type === 'amigos') {
+            document.getElementById('amigos-panel').style.display = 'block';
+            renderFriends();
+        }
+        
+        const rs = document.getElementById('route-setup');
+        if(type === 'map-only') rs.style.display = 'block';
+        else rs.style.display = 'none';
+    }
+
+
+    function handleForgot() {
+        const email = document.getElementById('forgot-email').value;
+        if (!email) {
+            alert("Por favor, digite seu e-mail.");
+            return;
+        }
+        // Simulação de envio
+        alert("Um link de recuperação foi enviado para: " + email);
+        navigate('screen-login');
+    }
+
+    // Garanta que a função navigate suporte todas as telas
+    function navigate(id) {
+        // Esconde todas as telas de auth
+        document.querySelectorAll('.auth-screen').forEach(s => s.style.display = 'none');
+        // Mostra a tela desejada
+        const target = document.getElementById(id);
+        if(target) {
+            target.style.display = 'block';
+        } else {
+            console.error("Tela não encontrada: " + id);
+        }
+    }
+
+     // --- INSERIR NO FINAL DO SCRIPT ---
+
+    function simularMovimentoAmigos() {
+        friendsList.forEach(amigo => {
+        // Se o amigo ainda não tem um marcador no mapa, nós criamos
+        if (!friendMarkers[amigo.id]) {
+            friendMarkers[amigo.id] = L.marker([amigo.lat, amigo.lon], { icon: iconFriend })
+                .addTo(map)
+                .bindPopup(`<b>${amigo.name}</b> está online`);
+        }
+
+        // Simula um pequeno deslocamento (como se estivesse dirigindo devagar)
+        const variacaoLat = (Math.random() - 0.5) * 0.0008;
+        const variacaoLon = (Math.random() - 0.5) * 0.0008;
+        
+        amigo.lat += variacaoLat;
+        amigo.lon += variacaoLon;
+
+        // Atualiza a posição da bolinha verde no mapa
+        friendMarkers[amigo.id].setLatLng([amigo.lat, amigo.lon]);
+    });
+}
+
+</script>
+</body>
+</html>
